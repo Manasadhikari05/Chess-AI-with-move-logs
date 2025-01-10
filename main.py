@@ -7,8 +7,8 @@ import os
 pygame.init()
 
 # Constants
-SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 800 
-BOARD_WIDTH = 600  
+SCREEN_WIDTH, SCREEN_HEIGHT = 1200, 800
+BOARD_WIDTH = 600
 SQUARE_SIZE = BOARD_WIDTH // 8
 FPS = 60
 
@@ -21,7 +21,7 @@ HIGHLIGHT_COLOR = (0, 255, 0)
 POSSIBLE_MOVE_COLOR = (255, 239, 184)
 TEXT_COLOR = (0, 0, 0)
 
-
+# Load chess piece images
 pieces = {}
 assets_dir = os.path.join(os.path.dirname(__file__), 'assets')
 piece_names = ["bk", "bn", "bb", "bp", "bq", "br", "wk", "wn", "wb", "wp", "wq", "wr"]
@@ -56,7 +56,11 @@ def ai_move(board):
 def draw_board():
     for row in range(8):
         for col in range(8):
-            color = LIGHT_SQUARE if (row + col) % 2 == 0 else DARK_SQUARE
+            if human_color == chess.BLACK:
+                actual_row, actual_col = 7 - row, 7 - col
+            else:
+                actual_row, actual_col = row, col
+            color = LIGHT_SQUARE if (actual_row + actual_col) % 2 == 0 else DARK_SQUARE
             pygame.draw.rect(
                 screen,
                 color,
@@ -68,35 +72,15 @@ def draw_board():
                 ),
             )
 
-    # Draw grid labels (A-H for columns and 1-8 for rows)
-    font = pygame.font.Font(None, 32)
-    for col in range(8):
-        # Draw column labels (A-H)
-        label = font.render(chr(65 + col), True, TEXT_COLOR)
-        screen.blit(
-            label,
-            (
-                col * SQUARE_SIZE + SQUARE_SIZE // 2 - label.get_width() // 2,
-                VERTICAL_MARGIN + 8 * SQUARE_SIZE + 5,  # Below the board
-            ),
-        )
-
-    for row in range(8):
-        # Draw row labels (1-8)
-        label = font.render(str(8 - row), True, TEXT_COLOR)
-        screen.blit(
-            label,
-            (
-                5,  # Left of the board
-                VERTICAL_MARGIN + row * SQUARE_SIZE + SQUARE_SIZE // 2 - label.get_height() // 2,
-            ),
-        )
-
 # Draw the pieces on the chessboard
 def draw_pieces():
     for row in range(8):
         for col in range(8):
-            square = chess.square(col, 7 - row)
+            if human_color == chess.BLACK:
+                actual_row, actual_col = 7 - row, 7 - col
+            else:
+                actual_row, actual_col = row, col
+            square = chess.square(actual_col, 7 - actual_row)
             piece = board.piece_at(square)
             if piece:
                 piece_str = f"{'w' if piece.color else 'b'}{piece.symbol().lower()}"
@@ -115,6 +99,8 @@ def highlight_legal_moves():
             if move.from_square == selected_square:
                 to_square = move.to_square
                 row, col = divmod(to_square, 8)
+                if human_color == chess.BLACK:
+                    row, col = 7 - row, 7 - col
                 pygame.draw.circle(
                     screen,
                     POSSIBLE_MOVE_COLOR,
@@ -128,34 +114,25 @@ def highlight_legal_moves():
 # Constants for scrolling
 SCROLL_SPEED = 30
 MOVE_LOG_HEIGHT = SCREEN_HEIGHT
-SCROLLABLE_AREA_HEIGHT = 2000
-
-# Global variable for scroll position
-scroll_pos = 0
 
 # Draw the move log with scrolling
 def draw_move_log(move_log):
-    global scroll_pos
-    font_human = pygame.font.SysFont('Comic Sans MS', 24)
-    font_ai = pygame.font.SysFont('Comic Sans MS', 24)
-    font_ai.set_bold(True)
-
+    font = pygame.font.SysFont('Comic Sans MS', 24)
     x_offset = BOARD_WIDTH + 20
-    y_offset = 20 - scroll_pos
+    y_offset = 20
     line_spacing = 30
 
     screen.fill((240, 240, 240), (BOARD_WIDTH, 0, SCREEN_WIDTH - BOARD_WIDTH, SCREEN_HEIGHT))
 
     for index, move in enumerate(move_log):
-        if "Human" in move:
-            move_text = font_human.render(move, True, (100, 149, 237))
+        if "(Human)" in move:
+            move_color = (139, 69, 19)  # Cream color for human moves
         else:
-            move_text = font_ai.render(move, True, (205, 192, 176))
+            move_color = (135, 206, 250)  # Sky blue color for AI moves
+
+        move_text = font.render(move, True, move_color)
         screen.blit(move_text, (x_offset, y_offset + index * line_spacing))
 
-    # Prevent scrolling beyond the first or last move
-    max_scroll = len(move_log) * line_spacing - SCREEN_HEIGHT
-    scroll_pos = max(min(scroll_pos, max_scroll), 0)
 
 # Display winner
 def display_winner(winner):
@@ -169,7 +146,7 @@ def display_winner(winner):
 
 # Main game loop
 def main():
-    global selected_square, human_color, scroll_pos
+    global selected_square, human_color
     running = True
     move_log = []
     move_number = 1  # Start counting moves from 1
@@ -196,6 +173,7 @@ def main():
                     elif SCREEN_HEIGHT // 2 + 30 <= pos[1] <= SCREEN_HEIGHT // 2 + 60:
                         human_color = chess.BLACK
 
+    # If human plays black, AI makes the first move
     if human_color == chess.BLACK:
         move = ai_move(board)
         board.push(move)
@@ -211,6 +189,8 @@ def main():
                 x, y = pygame.mouse.get_pos()
                 if x < BOARD_WIDTH:
                     col, row = x // SQUARE_SIZE, (y - VERTICAL_MARGIN) // SQUARE_SIZE
+                    if human_color == chess.BLACK:
+                        row, col = 7 - row, 7 - col
                     if 0 <= row < 8:
                         square = chess.square(col, 7 - row)
                         if selected_square is None:
@@ -231,8 +211,6 @@ def main():
                                     move_number += 1
                             else:
                                 selected_square = None
-            elif event.type == pygame.MOUSEWHEEL:
-                scroll_pos -= event.y * SCROLL_SPEED
 
         screen.fill((255, 255, 255))
         draw_board()
